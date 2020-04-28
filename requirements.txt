@@ -1,0 +1,7 @@
+validators
+beautifulsoup4
+requests
+chardet
+certifi
+idna
+soupsieve
