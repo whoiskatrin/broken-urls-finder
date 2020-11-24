@@ -3,7 +3,7 @@ import os
 import ssl
 import traceback
 import urllib
-from urllib.parse import urlparse, urlsplit
+from urllib.parse import urlparse, urlsplit, urljoin
 from urllib.request import urlopen
 
 import requests
@@ -26,7 +26,7 @@ def send_slack_notification(msg):
         print(traceback.format_exc())
 
 
-def checkKeyValuePairExistence(dic, key, value):
+def check_key_value_pair_existence(dic, key, value):
     try:
         return dic[key] == value
     except KeyError:
@@ -37,30 +37,51 @@ def uri_validator(x):
     try:
         result = urlparse(x)
         return all([result.scheme, result.netloc, result.path])
-    except:
+    except Exception as e:
+        print("type error: " + str(e))
+        print(traceback.format_exc())
         return False
+    
+def get_all_website_links(url):
+    """
+    Returns all URLs that is found on `url` in which it belongs to the same website
+    """
+    # all URLs of `url`
+    urls = set()
+    soup = BeautifulSoup(requests.get(url).content, "html.parser")
+    tags = soup.findAll("a")
+    for a_tag in tags:
+        href = a_tag.attrs.get("href")
+        if href == "" or href is None:
+            # href empty tag
+            continue
+        # join the URL if it's relative (not absolute link)
+        href = urljoin(url, href)
+        if not uri_validator(href):
+            # not a valid URL
+            continue
+        if 'https' in href:
+            urls.add(href)
+            continue
+        if 'http' in href:
+            urls.add(href)
+            continue
+        if href.startswith("/"):
+            base_url = "{0.scheme}://{0.netloc}".format(urlsplit(url))
+            urls.add(base_url + href)
+            continue
+        urls.add(href)
+    return urls
+
+
 
 
 def crawl(args):
     for arg in args:
-        links = []
         ssl._create_default_https_context = ssl._create_unverified_context
         html_page = urllib.request.urlopen(arg)
         soup = BeautifulSoup(html_page, features="html.parser")
-        for link in soup.findAll("a"):
-            href = link.get("href")
-            if href is None:
-                continue
-            if 'https' in href:
-                links.append(href)
-                continue
-            if 'http' in href:
-                links.append(href)
-                continue
-            if href.startswith("/"):
-                base_url = "{0.scheme}://{0.netloc}".format(urlsplit(arg))
-                links.append(base_url + href)
-                continue
+        links = get_all_website_links(arg)
         links = list(dict.fromkeys(links))
         for link in links:
             valid = validators.url(link)
@@ -86,9 +107,9 @@ def crawl(args):
             try:
                 response = requests.get(link)
                 status = response.status_code
-                if status != 200 and status != 999 and status != 403 and checkKeyValuePairExistence(brokenLinks,
-                                                                                                    arg,
-                                                                                                    link) is False:
+               if status not in codes_to_ignore and check_key_value_pair_existence(brokenLinks,
+                                                                                arg,
+                                                                                link) is False:
                     brokenLinks[arg] = link
                     send_slack_notification(f'Status code: [{status}] {link} found on {arg}')
             except requests.exceptions.MissingSchema:
