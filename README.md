@@ -16,8 +16,6 @@ These errors may arrise as a result of a desing change of a website, website mig
 
 When the script finishes, it shows you a summary of how many urls were broken and what environment was affected (DEV/PROD).
 
-## Slack channel with alerts: #tech-dead-links-alerts
-
 ## Future plans
 - In the future, refactor this script to make it multithreaded, so a large list of urls can get checked faster
 - Link depth limit
